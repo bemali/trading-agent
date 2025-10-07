@@ -1,131 +1,347 @@
 """
-Streamlit app for the three agents framework using LangGraph.
+Streamlit app for the trading agent platform.
 """
 
 import streamlit as st
 import os
-from dotenv import load_dotenv
-from src.graph import run_three_agents_workflow
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import altair as alt
+from pathlib import Path
+from datetime import datetime
 
-# Load environment variables
-load_dotenv()
+# Import utility modules
+from app.utils.storage import user_dir, read_json, write_json_with_lock
+from app.utils.finance import update_portfolio_prices
+from app.utils.news import get_news_for_stock
+from app.utils.agent_adapter import ask_agent
 
 # Set page configuration
 st.set_page_config(
-    page_title="Three Agents Debate System",
-    page_icon="🤖",
+    page_title="Trading Agent Platform",
+    page_icon="📈",
     layout="wide",
 )
 
-# App title and description
-st.title("Three Agents Debate System")
-st.markdown("""
-This application uses a three-agent debate system powered by LangGraph and OpenAI's GPT models:
+# Initialize session state variables
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "show_chat" not in st.session_state:
+    st.session_state.show_chat = False
 
-1. **Judge Agent**: Evaluates your question and provides instructions
-2. **Positive Agent**: Provides arguments in favor
-3. **Negative Agent**: Provides arguments against
+# Helper function to check if user exists
+def user_exists(username):
+    """Check if a user directory exists."""
+    return (user_dir(username) / "profile.json").exists()
 
-The Judge Agent then evaluates both arguments and provides a final verdict.
-""")
-
-# Sidebar for configuration
-st.sidebar.header("Configuration")
-
-# Model selection
-model = st.sidebar.selectbox(
-    "Select Model",
-    ["gpt-4", "gpt-3.5-turbo"],
-    index=0,
-)
-
-# API Key input
-api_key = st.sidebar.text_input(
-    "OpenAI API Key",
-    value=os.getenv("OPENAI_API_KEY", ""),
-    type="password",
-)
-
-# Save API key to session state
-if api_key:
-    os.environ["OPENAI_API_KEY"] = api_key
-
-# Main input area
-st.header("Ask a Question")
-question = st.text_area(
-    "Enter a controversial question or topic for debate:",
-    height=100,
-)
-
-# Process button
-if st.button("Start Debate", type="primary", disabled=not (question and api_key)):
-    if not api_key:
-        st.error("Please enter your OpenAI API key in the sidebar.")
-    elif not question:
-        st.error("Please enter a question.")
-    else:
-        # Show processing message
-        with st.spinner("The agents are debating your question..."):
-            try:
-                # Run the workflow
-                result = run_three_agents_workflow(question, model)
-                
-                # Display results in tabs
-                tab1, tab2, tab3, tab4 = st.tabs(["Judge Instructions", "Positive Arguments", "Negative Arguments", "Final Verdict"])
-                
-                with tab1:
-                    st.subheader("Judge's Instructions")
-                    st.markdown(result["judge_instructions"])
-                
-                with tab2:
-                    st.subheader("Positive Agent's Response")
-                    st.markdown(result["positive_response"])
-                
-                with tab3:
-                    st.subheader("Negative Agent's Response")
-                    st.markdown(result["negative_response"])
-                
-                with tab4:
-                    st.subheader("Judge's Final Verdict")
-                    st.markdown(result["final_verdict"])
-                
-                # Save to session history
-                if "history" not in st.session_state:
-                    st.session_state.history = []
-                
-                st.session_state.history.append({
-                    "question": question,
-                    "judge_instructions": result["judge_instructions"],
-                    "positive_response": result["positive_response"],
-                    "negative_response": result["negative_response"],
-                    "final_verdict": result["final_verdict"]
-                })
-                
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-                st.error("Please check your API key and try again.")
-
-# History section
-if "history" in st.session_state and st.session_state.history:
-    st.header("Previous Debates")
+# Helper function to create a new user
+def create_user(username):
+    """Create a new user profile."""
+    profile_path = user_dir(username) / "profile.json"
     
-    for i, item in enumerate(reversed(st.session_state.history)):
-        with st.expander(f"Debate {len(st.session_state.history) - i}: {item['question'][:50]}..."):
-            st.subheader("Question")
-            st.write(item["question"])
-            
-            st.subheader("Judge's Instructions")
-            st.write(item["judge_instructions"])
-            
-            st.subheader("Positive Arguments")
-            st.write(item["positive_response"])
-            
-            st.subheader("Negative Arguments")
-            st.write(item["negative_response"])
-            
-            st.subheader("Final Verdict")
-            st.write(item["final_verdict"])
+    # Create basic profile
+    profile = {
+        "name": username,
+        "created_at": datetime.now().isoformat(),
+        "meta": {}
+    }
+    
+    # Create empty portfolio
+    portfolio_path = user_dir(username) / "portfolio.json"
+    portfolio = []
+    
+    # Write files
+    write_json_with_lock(profile_path, profile)
+    write_json_with_lock(portfolio_path, portfolio)
+    
+    return True
 
-# Footer
-st.markdown("---")
-st.markdown("Built with Streamlit, LangGraph, and OpenAI")
+# Helper function to load user profile
+def load_user_profile(username):
+    """Load a user's profile data."""
+    profile_path = user_dir(username) / "profile.json"
+    return read_json(profile_path)
+
+# Helper function to load user portfolio
+def load_user_portfolio(username):
+    """Load a user's portfolio data."""
+    portfolio_path = user_dir(username) / "portfolio.json"
+    return read_json(portfolio_path) or []
+
+# Function to handle login
+def handle_login(username):
+    """Process user login."""
+    username = username.strip().lower()
+    
+    if not username:
+        return False, "Username cannot be empty."
+    
+    # Check if user exists, create if not
+    if not user_exists(username):
+        created = create_user(username)
+        if not created:
+            return False, "Failed to create user."
+    
+    # Set session state
+    st.session_state.username = username
+    st.session_state.chat_history = []
+    
+    return True, f"Welcome, {username}!"
+
+# Function to create portfolio bar chart
+def create_portfolio_chart(portfolio):
+    """Create a clustered bar chart for portfolio visualization."""
+    if not portfolio:
+        return None
+    
+    # Prepare data
+    chart_data = []
+    for item in portfolio:
+        purchase_value = round(item.get('purchase_price', 0) * item.get('quantity', 0), 2)
+        current_value = item.get('value', 0)
+        chart_data.append({
+            "Symbol": item.get('stock_code', 'Unknown'),
+            "Type": "Purchase Value",
+            "Value": purchase_value
+        })
+        chart_data.append({
+            "Symbol": item.get('stock_code', 'Unknown'),
+            "Type": "Current Value",
+            "Value": current_value
+        })
+    
+    df = pd.DataFrame(chart_data)
+    
+    # Create chart with Altair
+    chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X('Symbol:N', title='Stock'),
+        y=alt.Y('Value:Q', title='Value ($)'),
+        color=alt.Color('Type:N', scale=alt.Scale(
+            domain=['Purchase Value', 'Current Value'],
+            range=['#5778a4', '#e49444']
+        )),
+        tooltip=['Symbol', 'Type', 'Value']
+    ).properties(
+        title='Portfolio Values: Purchase vs Current',
+        height=400
+    )
+    
+    return chart
+
+# Login screen
+def show_login_screen():
+    """Display the login screen."""
+    st.title("Trading Agent Platform")
+    st.markdown("### Login to Your Account")
+    
+    with st.form("login_form"):
+        username = st.text_input("Username (no password required)")
+        submit_button = st.form_submit_button("Login")
+        
+        if submit_button:
+            success, message = handle_login(username)
+            if success:
+                st.success(message)
+                st.rerun()  # Refresh the app after successful login
+            else:
+                st.error(message)
+    
+    st.markdown("---")
+    st.markdown("*Don't have an account? Just enter a username to create one automatically.*")
+
+# Main application
+def show_main_app():
+    """Display the main application after login."""
+    username = st.session_state.username
+    
+    # Sidebar with profile info
+    with st.sidebar:
+        st.title(f"Welcome, {username}")
+        
+        profile = load_user_profile(username)
+        created_at = profile.get("created_at", "Unknown")
+        try:
+            # Try to parse and format the date
+            dt = datetime.fromisoformat(created_at)
+            created_at = dt.strftime("%b %d, %Y")
+        except:
+            pass
+        
+        st.markdown(f"**Account created:** {created_at}")
+        
+        st.markdown("---")
+        
+        # Navigation options
+        st.markdown("### Navigation")
+        
+        if st.button("📊 Portfolio View", use_container_width=True):
+            st.session_state.show_chat = False
+            st.rerun()
+            
+        if st.button("💬 Chat with Agent", use_container_width=True):
+            st.session_state.show_chat = True
+            st.rerun()
+        
+        st.markdown("---")
+        
+        # Logout button
+        if st.button("Logout", use_container_width=True):
+            st.session_state.username = None
+            st.rerun()  # Refresh the app after logout
+
+    # Main content area
+    if st.session_state.show_chat:
+        show_chat_interface()
+    else:
+        show_portfolio_interface()
+
+# Portfolio interface
+def show_portfolio_interface():
+    """Display the portfolio interface."""
+    st.title("Your Portfolio")
+    
+    username = st.session_state.username
+    portfolio = load_user_portfolio(username)
+    
+    # Update prices button
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        last_updated = "Never"
+        if portfolio and 'last_updated' in portfolio[0]:
+            try:
+                dt = datetime.fromisoformat(portfolio[0]['last_updated'])
+                last_updated = dt.strftime("%b %d, %Y at %I:%M %p")
+            except:
+                pass
+        st.markdown(f"*Last updated: {last_updated}*")
+    with col2:
+        if st.button("Update Prices", type="primary"):
+            with st.spinner("Updating prices..."):
+                success = update_portfolio_prices(username)
+                if success:
+                    st.success("Prices updated successfully!")
+                    # Reload portfolio with updated prices
+                    portfolio = load_user_portfolio(username)
+                else:
+                    st.error("Failed to update prices.")
+    
+    # Portfolio Summary
+    if not portfolio:
+        st.info("Your portfolio is empty. Add some stocks to get started!")
+    else:
+        # Create portfolio DataFrame for display
+        df_data = []
+        for item in portfolio:
+            df_data.append({
+                "Company": item.get('company_name', 'Unknown'),
+                "Symbol": item.get('stock_code', 'Unknown'),
+                "Quantity": item.get('quantity', 0),
+                "Purchase Price": f"${item.get('purchase_price', 0):.2f}",
+                "Current Price": f"${item.get('current_price', 0):.2f}",
+                "Total Value": f"${item.get('value', 0):.2f}",
+                "Return %": f"{item.get('percent_return', 0):.2f}%",
+                "Return $": f"${item.get('total_return', 0):.2f}"
+            })
+        
+        df = pd.DataFrame(df_data)
+        
+        # Calculate total portfolio value
+        total_value = sum(item.get('value', 0) for item in portfolio)
+        total_purchase = sum(item.get('purchase_price', 0) * item.get('quantity', 0) for item in portfolio)
+        total_return = total_value - total_purchase
+        total_return_percent = (total_return / total_purchase * 100) if total_purchase > 0 else 0
+        
+        # Portfolio metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Portfolio Value", f"${total_value:.2f}")
+        with col2:
+            st.metric("Total Return", f"${total_return:.2f}", f"{total_return_percent:.2f}%")
+        with col3:
+            num_stocks = len(portfolio)
+            st.metric("Number of Holdings", f"{num_stocks}")
+        
+        # Display portfolio table
+        st.markdown("### Holdings")
+        st.dataframe(
+            df,
+            hide_index=True,
+            column_config={
+                "Return %": st.column_config.NumberColumn(
+                    "Return %",
+                    format="%.2f%%",
+                    help="Percentage return on investment",
+                ),
+            },
+            use_container_width=True
+        )
+        
+        # Portfolio visualization
+        st.markdown("### Portfolio Visualization")
+        chart = create_portfolio_chart(portfolio)
+        if chart:
+            st.altair_chart(chart, use_container_width=True)
+        
+        # News section
+        st.markdown("### Latest News")
+        for item in portfolio:
+            symbol = item.get('stock_code')
+            if not symbol:
+                continue
+                
+            company_name = item.get('company_name', symbol)
+            st.markdown(f"#### {company_name} ({symbol})")
+            
+            news_items = get_news_for_stock(symbol, count=2)
+            for news in news_items:
+                with st.expander(f"{news['headline']} - {news['source']}"):
+                    st.markdown(f"*{news['date']}*")
+                    st.markdown(news['snippet'])
+            
+            st.markdown("---")
+
+# Chat interface
+def show_chat_interface():
+    """Display the chat interface."""
+    st.title("Chat with Trading Agent")
+    
+    username = st.session_state.username
+    
+    # Display chat history
+    for chat in st.session_state.chat_history:
+        with st.chat_message("user"):
+            st.markdown(chat["user"])
+        with st.chat_message("assistant"):
+            st.markdown(chat["assistant"])
+    
+    # Chat input
+    if prompt := st.chat_input("Ask a question about your portfolio or trading..."):
+        # Add user message to chat history
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Get response from agent
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = ask_agent(username, prompt, st.session_state.chat_history)
+                st.markdown(response)
+        
+        # Save to history
+        st.session_state.chat_history.append({
+            "user": prompt,
+            "assistant": response
+        })
+
+# Main app logic
+def main():
+    """Main application entry point."""
+    if st.session_state.username is None:
+        show_login_screen()
+    else:
+        show_main_app()
+
+if __name__ == "__main__":
+    main()
