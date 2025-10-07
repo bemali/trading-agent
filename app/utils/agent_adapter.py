@@ -18,8 +18,6 @@ def ask_agent(username: str, message: str, history: List[BaseMessage]) -> str:
     Returns:
         The agent's response as a string
     """
-    # Convert history to LangChain message format
-    messages = []
     
     # Add system message from chat instructions if this is a new conversation
     if not history:
@@ -30,4 +28,4 @@ def ask_agent(username: str, message: str, history: List[BaseMessage]) -> str:
         question=message,
         messages=history)
     
-    return result['response']
+    return result['response'], result['messages']

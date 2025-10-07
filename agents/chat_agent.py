@@ -111,7 +111,10 @@ def get_response(question: str, messages = None, graph_execution = None, recursi
     with open("agents/instructions/chat_instructions.md", "r") as f:
         agent_system_message = f.read()
 
-    
+    if messages is not None:
+        messages.append(HumanMessage(content=question))
+    else:
+        pass
 
     initial_state = {
         'question': question,

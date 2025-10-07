@@ -30,6 +30,8 @@ if "username" not in st.session_state:
     st.session_state.username = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "base_messages" not in st.session_state:
+    st.session_state.base_messages = []
 if "show_chat" not in st.session_state:
     st.session_state.show_chat = False
 
@@ -91,6 +93,7 @@ def handle_login(username):
     # Set session state
     st.session_state.username = username
     st.session_state.chat_history = []
+    st.session_state.base_messages = []
     
     return True, f"Welcome, {username}!"
 
@@ -333,6 +336,17 @@ def show_chat_interface():
     
     username = st.session_state.username
     
+    # Add a debug expander to show base messages
+    with st.expander("Debug: View Base Messages", expanded=False):
+        if st.session_state.base_messages:
+            st.markdown("### Current Base Messages")
+            for i, msg in enumerate(st.session_state.base_messages):
+                msg_type = type(msg).__name__
+                st.markdown(f"**Message {i+1} ({msg_type}):**")
+                st.code(msg.content[:200] + "..." if len(msg.content) > 200 else msg.content)
+        else:
+            st.info("No base messages in history yet.")
+    
     # Display chat history
     for chat in st.session_state.chat_history:
         with st.chat_message("user"):
@@ -349,7 +363,7 @@ def show_chat_interface():
         # Get response from agent
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                response = ask_agent(username, prompt, st.session_state.chat_history)
+                response, base_messages = ask_agent(username, prompt, st.session_state.base_messages)
                 st.markdown(response)
         
         # Save to history
@@ -357,6 +371,9 @@ def show_chat_interface():
             "user": prompt,
             "assistant": response
         })
+        
+        # Save base messages for future calls
+        st.session_state.base_messages = base_messages
 
 # Main app logic
 def main():
