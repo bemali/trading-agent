@@ -1,0 +1,57 @@
+[
+  {
+    "company_name": "Microsoft Corporation",
+    "stock_code": "MSFT",
+    "quantity": 5,
+    "purchase_price": 300.0,
+    "current_price": null,
+    "last_updated": null,
+    "value": null,
+    "total_return": null,
+    "percent_return": null
+  },
+  {
+    "company_name": "Google Inc.",
+    "stock_code": "GOOGL",
+    "quantity": 2,
+    "purchase_price": 2500.0,
+    "current_price": null,
+    "last_updated": null,
+    "value": null,
+    "total_return": null,
+    "percent_return": null
+  },
+  {
+    "company_name": "Tesla Inc.",
+    "stock_code": "TSLA",
+    "quantity": 15,
+    "purchase_price": 750.0,
+    "current_price": null,
+    "last_updated": null,
+    "value": null,
+    "total_return": null,
+    "percent_return": null
+  },
+  {
+    "company_name": "NVIDIA Corporation",
+    "stock_code": "NVDA",
+    "quantity": 12,
+    "purchase_price": 475.0,
+    "current_price": null,
+    "last_updated": null,
+    "value": null,
+    "total_return": null,
+    "percent_return": null
+  },
+  {
+    "company_name": "Advanced Micro Devices, Inc.",
+    "stock_code": "AMD",
+    "quantity": 25,
+    "purchase_price": 90.0,
+    "current_price": null,
+    "last_updated": null,
+    "value": null,
+    "total_return": null,
+    "percent_return": null
+  }
+]

@@ -1,0 +1,35 @@
+[
+  {
+    "company_name": "Apple Inc.",
+    "stock_code": "AAPL",
+    "quantity": 10,
+    "purchase_price": 150.0,
+    "current_price": 256.69,
+    "last_updated": "2025-10-07T10:37:51.364884",
+    "value": 2566.9,
+    "total_return": 1066.9,
+    "percent_return": 71.13
+  },
+  {
+    "company_name": "NVIDIA Corporation",
+    "stock_code": "NVDA",
+    "quantity": 8,
+    "purchase_price": 450.0,
+    "current_price": 185.54,
+    "last_updated": "2025-10-07T10:37:51.364884",
+    "value": 1484.32,
+    "total_return": -2115.68,
+    "percent_return": -58.77
+  },
+  {
+    "company_name": "Advanced Micro Devices, Inc.",
+    "stock_code": "AMD",
+    "quantity": 20,
+    "purchase_price": 95.0,
+    "current_price": 203.71,
+    "last_updated": "2025-10-07T10:37:51.364884",
+    "value": 4074.2,
+    "total_return": 2174.2,
+    "percent_return": 114.43
+  }
+]
