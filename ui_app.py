@@ -121,10 +121,16 @@ def create_portfolio_chart(portfolio):
     
     df = pd.DataFrame(chart_data)
     
-    # Create chart with Altair
+    # Create clustered bar chart with Altair
+    # Using "column" to create clusters by Type
     chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('Symbol:N', title='Stock'),
+        # Create columns by Type to make clustered bars
+        column=alt.Column('Type:N', title=None),
+        # X-axis shows the symbols
+        x=alt.X('Symbol:N', title='Stock', axis=alt.Axis(labelAngle=-45)),
+        # Y-axis shows the values
         y=alt.Y('Value:Q', title='Value ($)'),
+        # Color distinguishes between purchase and current values
         color=alt.Color('Type:N', scale=alt.Scale(
             domain=['Purchase Value', 'Current Value'],
             range=['#5778a4', '#e49444']
@@ -133,6 +139,8 @@ def create_portfolio_chart(portfolio):
     ).properties(
         title='Portfolio Values: Purchase vs Current',
         height=400
+    ).configure_view(
+        stroke=None
     )
     
     return chart

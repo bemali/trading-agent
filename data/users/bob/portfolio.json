@@ -4,21 +4,21 @@
     "stock_code": "MSFT",
     "quantity": 5,
     "purchase_price": 300.0,
-    "current_price": 526.45,
-    "last_updated": "2025-10-08T00:31:40.226755",
-    "value": 2632.25,
-    "total_return": 1132.25,
-    "percent_return": 75.48
+    "current_price": 527.28,
+    "last_updated": "2025-10-08T00:43:20.797162",
+    "value": 2636.4,
+    "total_return": 1136.4,
+    "percent_return": 75.76
   },
   {
     "company_name": "Google Inc.",
     "stock_code": "GOOGL",
     "quantity": 2,
     "purchase_price": 2500.0,
-    "current_price": 247.98,
-    "last_updated": "2025-10-08T00:31:40.226755",
-    "value": 495.96,
-    "total_return": -4504.04,
+    "current_price": 247.96,
+    "last_updated": "2025-10-08T00:43:20.797162",
+    "value": 495.92,
+    "total_return": -4504.08,
     "percent_return": -90.08
   },
   {
@@ -26,32 +26,32 @@
     "stock_code": "TSLA",
     "quantity": 15,
     "purchase_price": 750.0,
-    "current_price": 447.74,
-    "last_updated": "2025-10-08T00:31:40.226755",
-    "value": 6716.1,
-    "total_return": -4533.9,
-    "percent_return": -40.3
+    "current_price": 446.86,
+    "last_updated": "2025-10-08T00:43:20.797162",
+    "value": 6702.9,
+    "total_return": -4547.1,
+    "percent_return": -40.42
   },
   {
     "company_name": "NVIDIA Corporation",
     "stock_code": "NVDA",
     "quantity": 12,
     "purchase_price": 475.0,
-    "current_price": 188.19,
-    "last_updated": "2025-10-08T00:31:40.226755",
-    "value": 2258.28,
-    "total_return": -3441.72,
-    "percent_return": -60.38
+    "current_price": 187.65,
+    "last_updated": "2025-10-08T00:43:20.797162",
+    "value": 2251.8,
+    "total_return": -3448.2,
+    "percent_return": -60.49
   },
   {
     "company_name": "Advanced Micro Devices, Inc.",
     "stock_code": "AMD",
     "quantity": 25,
     "purchase_price": 90.0,
-    "current_price": 214.05,
-    "last_updated": "2025-10-08T00:31:40.226755",
-    "value": 5351.25,
-    "total_return": 3101.25,
-    "percent_return": 137.83
+    "current_price": 213.03,
+    "last_updated": "2025-10-08T00:43:20.797162",
+    "value": 5325.75,
+    "total_return": 3075.75,
+    "percent_return": 136.7
   }
 ]

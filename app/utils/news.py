@@ -1,10 +1,12 @@
 """
 News utility for generating and retrieving news related to stocks.
+Uses news_agent.py to fetch real news when available, with static fallback data.
 """
 
 import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from agents.news_agent import run_workflow
 
 # Sample news headlines and snippets for different stock sectors
 TECH_NEWS = [
@@ -55,7 +57,8 @@ STOCK_CATEGORIES = {
 
 def get_news_for_stock(symbol: str, count: int = 3) -> List[Dict[str, Any]]:
     """
-    Get news articles for a specific stock symbol.
+    Get news articles for a specific stock symbol using news_agent.py.
+    Falls back to static sample data if the agent fails.
     
     Args:
         symbol: Stock symbol (e.g., 'AAPL')
@@ -64,15 +67,45 @@ def get_news_for_stock(symbol: str, count: int = 3) -> List[Dict[str, Any]]:
     Returns:
         List of news items with headlines, snippets, and dates
     """
-    # Select appropriate news category for the stock
-    news_category = STOCK_CATEGORIES.get(symbol, STOCK_CATEGORIES["DEFAULT"])
+    try:
+        # Attempt to get real news using news_agent
+        agent_result = run_workflow(symbol)
+        
+        if agent_result and "final_verdict" in agent_result and agent_result["final_verdict"]:
+            # Process agent result
+            now = datetime.now()
+            formatted_date = now.strftime("%b %d, %Y at %I:%M %p")
+            
+            # Create a news item from the agent result
+            result = [{
+                "headline": f"Latest {symbol} Analysis",
+                "snippet": agent_result["final_verdict"],
+                "date": formatted_date,
+                "source": "Trading Agent News Analysis",
+                "symbol": symbol
+            }]
+            
+            # If URLs are available in the agent result, add them
+            if "urls" in agent_result and agent_result["urls"]:
+                for i, url in enumerate(agent_result["urls"][:min(count-1, len(agent_result["urls"]))]):
+                    result.append({
+                        "headline": f"Additional Source {i+1}",
+                        "snippet": f"Reference link: {url}",
+                        "date": formatted_date,
+                        "source": "Reference",
+                        "symbol": symbol
+                    })
+            
+            return result
+    except Exception as e:
+        print(f"Error getting news from agent: {e}")
+        # Fall back to static news data
     
-    # Generate random news items from the category
+    # Fallback: Use static news data
+    news_category = STOCK_CATEGORIES.get(symbol, STOCK_CATEGORIES["DEFAULT"])
     news_items = random.sample(news_category, min(count, len(news_category)))
     
-    # Add random dates within the last week
     now = datetime.now()
-    
     result = []
     for item in news_items:
         # Random date within the past week
