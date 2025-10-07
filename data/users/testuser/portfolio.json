@@ -1,0 +1,35 @@
+[
+  {
+    "company_name": "Apple Inc.",
+    "stock_code": "AAPL",
+    "quantity": 10,
+    "purchase_price": 150.0,
+    "current_price": 256.69,
+    "last_updated": "2025-10-07T12:02:37.590017",
+    "value": 2566.9,
+    "total_return": 1066.9,
+    "percent_return": 71.13
+  },
+  {
+    "company_name": "Microsoft Corporation",
+    "stock_code": "MSFT",
+    "quantity": 5,
+    "purchase_price": 300.0,
+    "current_price": 528.57,
+    "last_updated": "2025-10-07T12:02:37.590017",
+    "value": 2642.85,
+    "total_return": 1142.85,
+    "percent_return": 76.19
+  },
+  {
+    "company_name": "Made Up Company",
+    "stock_code": "FAKE",
+    "quantity": 20,
+    "purchase_price": 50.0,
+    "current_price": 50.0,
+    "last_updated": "2025-10-07T12:02:37.590017",
+    "value": 1000.0,
+    "total_return": 0.0,
+    "percent_return": 0.0
+  }
+]

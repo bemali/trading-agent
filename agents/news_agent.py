@@ -11,8 +11,8 @@ from langgraph.types import Command
 #from src.state import AgentState
 from src.llms import get_llm
 from src.tools import web_search
-from src.tracking_tool_node import TrackingToolNode, CustomToolNode
-from src.state import AgentState
+from src.custom_tool_node import TrackingToolNode, CustomToolNode
+from src.state import NewsAgentState
 
 
 
@@ -31,7 +31,7 @@ def create_graph(model:str)-> StateGraph:
     # Define Agents
 
     # Judge Agent
-    def judge_agent(state: AgentState):
+    def judge_agent(state: NewsAgentState):
         """"Judge agent provides initial instructions"""
 
         # judge's decisions
@@ -61,7 +61,7 @@ def create_graph(model:str)-> StateGraph:
         })
     
     # Research Agent
-    def research_agent(state: AgentState):
+    def research_agent(state: NewsAgentState):
         """Researches based on the judge's instructions"""
         research_llm = get_llm(model)
         research_llm = research_llm.bind_tools(tools)
@@ -80,7 +80,7 @@ def create_graph(model:str)-> StateGraph:
     
     # add conditions for conditional routing
 
-    def check_reached_verdict(state:AgentState):
+    def check_reached_verdict(state:NewsAgentState):
 
         reached_verdict = state["reached_verdict"]
         if reached_verdict:
@@ -89,7 +89,7 @@ def create_graph(model:str)-> StateGraph:
             return "research"
         
     
-    def check_research_message(state:AgentState):
+    def check_research_message(state:NewsAgentState):
 
         last_research_message = state["research_messages"][-1]
 
@@ -100,7 +100,7 @@ def create_graph(model:str)-> StateGraph:
     
 
     # Create the graph
-    workflow = StateGraph(AgentState)
+    workflow = StateGraph(NewsAgentState)
     
     # Add nodes to the graph
     workflow.add_node("judge", judge_agent)

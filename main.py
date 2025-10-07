@@ -1,4 +1,4 @@
-from src.simple_graph import run_workflow
+from src.news_agent import run_workflow
 from dotenv import load_dotenv
 import json
 import os

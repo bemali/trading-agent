@@ -1,9 +1,9 @@
 from langgraph.prebuilt import ToolNode
 import inspect
-from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 from typing import List, TypedDict, Any
-from src.state import AgentState
+from langchain_core.messages import AIMessage, HumanMessage, BaseMessage, ToolMessage, SystemMessage
+from langgraph.graph import StateGraph, END
 
 class TrackingToolNode(ToolNode):
     def __call__(self, state):
@@ -31,7 +31,7 @@ class CustomToolNode:
         # Build internal mapping for lookup
         self.tools_by_name = {t.name: t for t in tools}
 
-    def __call__(self, state: AgentState) -> Command:
+    def __call__(self, state) -> Command:
         commands = []
         tool_calls = getattr(state["messages"][-1], "tool_calls", [])
 
@@ -78,3 +78,30 @@ class CustomToolNode:
             merged_update["graph_execution"].extend(cmd.update.get("graph_execution", []))
 
         return Command(update=merged_update)
+    
+
+# Tool call conditions
+
+def call_tool_condition(state):
+
+        last_message = state["messages"][-1]
+        case_status = state["case_status"]
+
+        if case_status == 'open':
+
+            if isinstance(last_message,AIMessage) and last_message.tool_calls:
+                return 'tools'
+            else:
+                return 'agent'
+        else:
+            return END
+        
+def tool_return_condition(state):
+
+    last_message = state["messages"][-1]
+    case_status = state["case_status"]
+
+    if case_status == 'open' and isinstance(last_message,ToolMessage) and last_message.content:
+        return 'agent'
+    else:
+        return END

@@ -16,6 +16,7 @@ from app.utils.storage import user_dir, read_json, write_json_with_lock
 from app.utils.finance import update_portfolio_prices
 from app.utils.news import get_news_for_stock
 from app.utils.agent_adapter import ask_agent
+from app.src.portfolio_updater import update_portfolio_in_background
 
 # Set page configuration
 st.set_page_config(
@@ -62,13 +63,15 @@ def create_user(username):
 # Helper function to load user profile
 def load_user_profile(username):
     """Load a user's profile data."""
-    profile_path = user_dir(username) / "profile.json"
+    profile_path = user_dir(username) / "profile.json"    
     return read_json(profile_path)
 
 # Helper function to load user portfolio
 def load_user_portfolio(username):
     """Load a user's portfolio data."""
     portfolio_path = user_dir(username) / "portfolio.json"
+    # Trigger background update of portfolio prices
+    update_portfolio_in_background(username)
     return read_json(portfolio_path) or []
 
 # Function to handle login
@@ -174,6 +177,21 @@ def show_main_app():
         
         st.markdown("---")
         
+        # LLM model selection
+        st.markdown("### LLM Model Settings")
+        llm_model = st.selectbox(
+            "Select LLM Model",
+            options=["gpt-4.1", "gpt-4.0"],
+            index=0,
+            key="llm_model"
+        )
+        
+        # Update environment variable based on selection
+        os.environ["LLM_MODEL"] = llm_model
+        st.markdown(f"*Using model: {llm_model}*")
+        
+        st.markdown("---")
+        
         # Navigation options
         st.markdown("### Navigation")
         
@@ -235,12 +253,17 @@ def show_portfolio_interface():
         # Create portfolio DataFrame for display
         df_data = []
         for item in portfolio:
+            # Ensure all numeric values have proper defaults to avoid None formatting issues
+            current_price = item.get('current_price')
+            if current_price is None:
+                current_price = 0
+                
             df_data.append({
                 "Company": item.get('company_name', 'Unknown'),
                 "Symbol": item.get('stock_code', 'Unknown'),
                 "Quantity": item.get('quantity', 0),
                 "Purchase Price": f"${item.get('purchase_price', 0):.2f}",
-                "Current Price": f"${item.get('current_price', 0):.2f}",
+                "Current Price": f"${current_price:.2f}",
                 "Total Value": f"${item.get('value', 0):.2f}",
                 "Return %": f"{item.get('percent_return', 0):.2f}%",
                 "Return $": f"${item.get('total_return', 0):.2f}"
