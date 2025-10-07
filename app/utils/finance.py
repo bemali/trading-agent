@@ -3,6 +3,45 @@ from datetime import datetime
 from pathlib import Path
 from app.utils.storage import user_dir, read_json, write_json_with_lock
 
+def get_recent_prices(symbol:str)->list:
+    """
+    Get the recent prices of a stock by its symbol using yfinance.
+    Fetches the last 3 months of price data.
+    
+    Args:
+        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+        
+    Returns:
+        List of strings with date and closing price information
+    """
+    try:
+        # Get ticker information
+        ticker = yf.Ticker(symbol)
+        
+        # Get the historical price data for the last 3 months
+        data = ticker.history(period='3mo')
+        
+        # If data is empty, return empty list
+        if data.empty:
+            return []
+        
+        # Format the results as a list of strings
+        price_list = []
+        for date, row in data.iterrows():
+            # Format date as string and get closing price
+            date_str = date.strftime('%Y-%m-%d')
+            close_price = round(row['Close'], 2)
+            
+            # Format as requested: "date":{date}, "closing_price":{closing_price}
+            price_entry = f"\"date\":\"{date_str}\", \"closing_price\":{close_price}"
+            price_list.append(price_entry)
+        
+        return price_list
+    except Exception as e:
+        print(f"Error fetching historical prices for {symbol}: {e}")
+        return []
+
+
 def get_current_price(symbol: str) -> float:
     """
     Get the current price of a stock by its symbol using yfinance.

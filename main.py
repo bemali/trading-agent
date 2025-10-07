@@ -1,9 +1,10 @@
 from agents.news_agent import run_workflow
+from agents.chat_agent import get_response
 from dotenv import load_dotenv
 import json
 import os
 
-def main():
+def news_agent():
 
     load_dotenv()
 
@@ -14,9 +15,17 @@ def main():
     print(result['graph_execution'])
 
 
+def chat_agent():
+
+    question= input("What is your question:")
+
+    result = get_response(question)
+    print(result['response'])
+    print(result['graph_execution'])
+
 if __name__ == "__main__":
 
-    main()
+    chat_agent()
 
 
     

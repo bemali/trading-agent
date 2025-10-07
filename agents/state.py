@@ -27,7 +27,11 @@ class ChatAgentState(TypedDict):
     question: str 
     # Messages for the tools used
     messages: List[BaseMessage]
+    # Reference URLs
+    urls: List[str]
+    # Response
+    response: str
     # Graph execution
-    graph_execution: List[str]
+    graph_execution: List[dict]
     # Recursion count
     recursion_count:int

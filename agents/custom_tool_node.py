@@ -113,7 +113,7 @@ class CustomToolNode:
 def call_tool_condition(state):
 
         last_message = state["messages"][-1]
-        case_status = state["reached_conclusion"]
+        case_status = state.get("reached_conclusion",False)
 
         if case_status:
             return "end"
@@ -131,7 +131,7 @@ def call_tool_condition(state):
 def tool_return_condition(state):
 
     last_message = state["messages"][-1]
-    case_status = state["reached_conclusion"]
+    case_status = state.get("reached_conclusion",False)
 
     if case_status == False and isinstance(last_message,ToolMessage) and last_message.content:
         return 'agent'
