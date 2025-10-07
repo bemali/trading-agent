@@ -56,27 +56,55 @@ class CustomToolNode:
             if isinstance(result, Command):
                 commands.append(result)
             else:
-                commands.append(
-                    Command(
-                        update={
-                            "messages": [
-                                ToolMessage(
-                                    content=str(result),
-                                    name=tool_name,
-                                    tool_call_id=tool_call.get("id")
-                                )
-                            ],
-                            "graph_execution": [tool_name]  # track executed tool
-                        }
-                    )
-                )
+                # Get the response and state_updates from the tool result
+                response = result.get('response', {})
+                state_updates = result.get('state_updates', {})
+                
+                # Prepare base update with message
+                update_dict = {
+                    "messages": [
+                        ToolMessage(
+                            content=str(response),
+                            name=tool_name,
+                            tool_call_id=tool_call.get("id")
+                        )
+                    ]
+                }
+                
+                # Add graph_execution to track executed tools
+                if "graph_execution" in state_updates:
+                    update_dict["graph_execution"] = state_updates.pop("graph_execution")
+                
+                # Add any other state updates that match AgentState keys
+                for key, value in state_updates.items():
+                    update_dict[key] = value
+                
+                commands.append(Command(update=update_dict))
 
         # Merge all updates into a single Command
-        merged_update = {"messages": [], "graph_execution": state["graph_execution"]}
+        # Start with base state values that need to be extended
+        merged_update = {"messages": state.get("messages"), "graph_execution": state.get("graph_execution")}
+        
+        # Keep track of other state fields that should use the last value
+        other_updates = {}
+        
+        # Process all commands
         for cmd in commands:
+            # Always extend messages and graph_execution
             merged_update["messages"].extend(cmd.update.get("messages", []))
-            merged_update["graph_execution"].extend(cmd.update.get("graph_execution", []))
 
+            if "graph_execution" in cmd.update:
+                merged_update["graph_execution"].extend(cmd.update.get("graph_execution"))
+            
+            # For other fields, store the latest value
+            for key, value in cmd.update.items():
+                if key not in ["messages", "graph_execution"]:
+                    other_updates[key] = value
+        
+        #print("MERGED UPDATE", merged_update["messages"])
+        # Add all other updates to the merged update
+        merged_update.update(other_updates)
+        
         return Command(update=merged_update)
     
 
@@ -85,23 +113,27 @@ class CustomToolNode:
 def call_tool_condition(state):
 
         last_message = state["messages"][-1]
-        case_status = state["case_status"]
+        case_status = state["reached_conclusion"]
 
-        if case_status == 'open':
+        if case_status:
+            return "end"
 
-            if isinstance(last_message,AIMessage) and last_message.tool_calls:
-                return 'tools'
+        if isinstance(last_message, AIMessage):
+            if getattr(last_message, "tool_calls", None):
+                # Tools requested → run tools next
+                return "tools"
             else:
-                return 'agent'
-        else:
-            return END
+                # Regular response → let agent re-enter loop
+                return "agent"
+
+        return "end"
         
 def tool_return_condition(state):
 
     last_message = state["messages"][-1]
-    case_status = state["case_status"]
+    case_status = state["reached_conclusion"]
 
-    if case_status == 'open' and isinstance(last_message,ToolMessage) and last_message.content:
+    if case_status == False and isinstance(last_message,ToolMessage) and last_message.content:
         return 'agent'
     else:
-        return END
+        return 'end'

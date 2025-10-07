@@ -9,150 +9,170 @@ from dotenv import load_dotenv
 import inspect
 from langgraph.types import Command
 #from src.state import AgentState
-from src.llms import get_llm
-from src.tools import web_search
-from src.custom_tool_node import TrackingToolNode, CustomToolNode
-from src.state import NewsAgentState
+from agents.llms import get_llm
+from agents.tools import web_search, reach_conclusion
+from agents.custom_tool_node import CustomToolNode, call_tool_condition, tool_return_condition
+from agents.state import NewsAgentState
+from pathlib import Path
+from datetime import datetime
 
 
 
 
 
-def create_graph(model:str)-> StateGraph:
+def create_graph()-> StateGraph:
 
     # Define nodes
 
     # Tool nodes
-    tools = [web_search]
+    tools = [web_search, reach_conclusion]
 
     # Tool call node
     tool_node = CustomToolNode(tools)
     
     # Define Agents
 
-    # Judge Agent
-    def judge_agent(state: NewsAgentState):
+    # news Agent
+    def news_agent(state: NewsAgentState):
         """"Judge agent provides initial instructions"""
 
-        # judge's decisions
-        reached_verdict = False
-        final_verdict =""
+    
+
+        # recursion count decisions
         recursion_count = state["recursion_count"]+1
+         #llm
+        llm = get_llm()
+        llm = llm.bind_tools(tools)
 
-        judge_llm = get_llm(model)
+
         if state["messages"] != []:
-            last_message_received = state["messages"][-1]
-            state["judge_messages"].append(last_message_received )
 
-        response = judge_llm.invoke(state["judge_messages"])
-        if "verdict" in response.content.lower() or state["recursion_count"]>3:
-            reached_verdict = True
-            final_verdict = response.content
+            try: 
+                response = llm.invoke(state["messages"])
+            except:
+               pass
+               
+
+
+
+        # logging the event for debug
+
+        activity_type = 'tool_call' if response.tool_calls else 'ai'
+
+        event = {'activity': 'agent', 'activity_type': activity_type , 'status': 'success'}
+
+        # get the existing state variables
+        messages = state.get('messages',[])
+        graph_execution = state.get("graph_execution", [])
+
+        # update the state variables
+        messages.append(response)
+        graph_execution.append(event)
+    
+
+        
 
 
         return Command(update={
-            "messages": [response],
-            "graph_execution": state.get("graph_execution", []) + ["judge"],
-            "judge_messages": state.get("judge_messages",[])+[response ],
-            "reached_verdict":reached_verdict,
-            "final_verdict":final_verdict,
+            "graph_execution": graph_execution,
+            "messages": messages,
             "recursion_count":recursion_count
 
         })
     
-    # Research Agent
-    def research_agent(state: NewsAgentState):
-        """Researches based on the judge's instructions"""
-        research_llm = get_llm(model)
-        research_llm = research_llm.bind_tools(tools)
+    def summarize(state: NewsAgentState):
 
-        last_message_received = state["messages"][-1]
-        state["research_messages"].append(last_message_received )
+        """summarizes the research by the agent"""
 
-        response = research_llm.invoke(state["research_messages"])
+        llm = get_llm()
+        messages = state.get("messages")
+
+        current_date = datetime.now().strftime("%Y-%m-%d")
+
+        system_message = f"Analyze the AI messages below and produce a concise summary highlighting the most recent news, trends, or events related to the specified stock. If the news is not relevant to make and immediate stock decision as of {current_date}, please mention so. Limit your response to 100 words maximum. Add relevant URLs to your response"
+
+        messages_to_summarize = [SystemMessage(content = system_message)]
+
+        for msg in messages:
+            if isinstance(msg, AIMessage) or isinstance(msg, ToolMessage):
+                if msg.content !='':
+
+                    messages_to_summarize.append(AIMessage(content=msg.content))
+
+        response = llm.invoke(messages_to_summarize)
+        final_verdict = response.content
+        event = {'activity': 'summarize', 'activity_type': 'ai' , 'status': 'success'}
+
+        # get the existing state variables
+        graph_execution = state.get("graph_execution", [])
+        graph_execution.append(event)
 
         return Command(update={
-            "messages": [response],
-            "graph_execution": state.get("graph_execution", []) + ["research"],
-            "research_messages": state.get("research_messages",[])+[response ]
+            "graph_execution": graph_execution,
+            "final_verdict":final_verdict
         })
+
+
     
     
-    # add conditions for conditional routing
+    
 
-    def check_reached_verdict(state:NewsAgentState):
 
-        reached_verdict = state["reached_verdict"]
-        if reached_verdict:
-            return END
-        else:
-            return "research"
+
         
-    
-    def check_research_message(state:NewsAgentState):
-
-        last_research_message = state["research_messages"][-1]
-
-        if isinstance(last_research_message, AIMessage) and last_research_message.content and not state["reached_verdict"]:
-            return "judge"
-        else:
-            return "tools"
     
 
     # Create the graph
     workflow = StateGraph(NewsAgentState)
     
     # Add nodes to the graph
-    workflow.add_node("judge", judge_agent)
-    workflow.add_node("research", research_agent)
-    workflow.add_node("tools",tool_node )
+    workflow.add_node("news_agent", news_agent)
+    workflow.add_node("tools",tool_node)
+    workflow.add_node("summarize",summarize)
     
     # Define the edges
     # Start with the judge
-    workflow.set_entry_point("judge")
+    workflow.set_entry_point("news_agent")
     
-    # From judge to research
+    
+    # From agent to tools if tools are called
     workflow.add_conditional_edges(
-        "judge",
-        check_reached_verdict
+        "news_agent",
+        call_tool_condition,
+        {'end': "summarize",
+         'agent': "news_agent",
+         'tools':'tools'}
     )
     
-    # From research to tools if tools are called
-    workflow.add_conditional_edges(
-        "research",
-        check_research_message
-    )
+    # From tools back to agent
+    workflow.add_conditional_edges("tools", tool_return_condition,
+                      {'end': "summarize",
+                       'agent': 'news_agent'})
     
-    # From tools back to research
-    workflow.add_edge("tools", "research")
-
-    # Finally, judge to complete
-    workflow.add_edge("judge", END)
+    # summarize to end
+    workflow.add_edge("summarize",END)
     
     # Compile the graph
     return workflow.compile()
 
-def run_workflow(model:str, question:str):
+def run_workflow(stock_code:str):
 
-    judge_system_message = "Your task is to rephrase the user question in a more academic manner, and provide instructions for the research agent to be able to research better on the latest information. your research agent can search latest info till 2026. better if their results are based on post June 2024 results. Once the research agent comes back with its response, give your verdict, properly summarize what the research agent has come up with including relevant citations and end the loop. Never mention the word 'verdict', unless you have come up with the final verdict."
-
-    research_agent_system_message = "Your task is to search the web and get the info"
+    # Load judge instructions
+    with open("agents/instructions/news_agent_instructions.md","r") as f:
+        agent_system_message= f.read()
 
     initial_state = {
-        "question": question,
-        "messages": [],
-        "judge_messages": [SystemMessage(content=judge_system_message ), HumanMessage(content=question)],
-        "research_messages": [SystemMessage(content=research_agent_system_message )],
+        "stock_code": stock_code,
+        "messages": [SystemMessage(content=agent_system_message ), HumanMessage(content=f"instruct how to research on this stock code: {stock_code}")],
         "urls": [],
-        "reached_verdict": False,
+        "reached_conclusion": False,
         "final_verdict": "",
-        "summary": "",
         "graph_execution":[],
         "recursion_count": 0
     }
 
     # Create the graph
-    graph = create_graph(model)
+    graph = create_graph()
     
     
     # Run the workflow with the model and initial state
